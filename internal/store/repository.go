@@ -187,12 +187,12 @@ func (r *Repository) commit(value *domain.CoordinationCase, action, actor string
 	if err := sealEvent(&event); err != nil {
 		return err
 	}
-	r.lastSequence = event.Sequence
-	r.lastHash = event.Hash
-	r.applyEvent(event)
 	if err := appendLedger(r.ledgerPath, event); err != nil {
 		return err
 	}
+	r.lastSequence = event.Sequence
+	r.lastHash = event.Hash
+	r.applyEvent(event)
 	if err := r.persistProjection(occurredAt); err != nil {
 		return err
 	}

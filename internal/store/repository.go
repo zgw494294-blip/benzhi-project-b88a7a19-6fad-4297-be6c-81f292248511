@@ -233,5 +233,13 @@ func cloneDetails(value map[string]any) map[string]any {
 // cloneAuditEntries is the boundary between the repository projection and query callers.
 // It must return detached entries so a caller cannot mutate the audit history.
 func cloneAuditEntries(entries []domain.AuditEntry) []domain.AuditEntry {
-	return entries
+	if entries == nil {
+		return nil
+	}
+	result := make([]domain.AuditEntry, len(entries))
+	for i, entry := range entries {
+		entry.Details = cloneDetails(entry.Details)
+		result[i] = entry
+	}
+	return result
 }

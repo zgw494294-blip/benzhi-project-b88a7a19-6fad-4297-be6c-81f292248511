@@ -78,6 +78,9 @@ func (e *Engine) evaluatePoint(proposal domain.TransmitterProposal, receiver dom
 }
 
 func (e *Engine) VerifyInput(assessment domain.InterferenceAssessment, proposal domain.TransmitterProposal, receivers []domain.ProtectedReceiver) (bool, string, error) {
+	if e == nil || e.Version == "" {
+		return false, "", domain.NewError(domain.CodeIntegrity, "分析引擎版本缺失")
+	}
 	digest, err := inputDigest(e.Version, assessment.CaseID, proposal, receivers)
 	if err != nil {
 		return false, "", err

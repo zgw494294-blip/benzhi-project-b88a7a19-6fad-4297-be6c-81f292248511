@@ -38,3 +38,15 @@ func requireActor(actor string) error {
 	}
 	return nil
 }
+
+// requireEngine guards against a service constructed without an analysis engine.
+// When the engine dependency is absent (a nil AssessmentEngine), invoking any of
+// its methods would dereference a nil interface and panic. Callers cannot recover
+// such failures, so the query surfaces a domain.CodeIntegrity error that
+// errors.As can match, without touching the coordination case or audit trail.
+func requireEngine(engine AssessmentEngine) error {
+	if engine == nil {
+		return domain.NewError(domain.CodeIntegrity, "协调服务缺少可用的分析引擎")
+	}
+	return nil
+}

@@ -62,6 +62,9 @@ func (s *Service) Remediation(caseID string) (RemediationResult, error) {
 	if !ok || proposal.Revision != assessment.ProposalRevision {
 		return RemediationResult{}, domain.NewError(domain.CodeIntegrity, "分析与候选绑定不完整")
 	}
+	if err := requireEngine(s.engine); err != nil {
+		return RemediationResult{}, err
+	}
 	verification, err := s.engine.VerifyAssessment(assessment, proposal, value.Receivers)
 	if err != nil {
 		return RemediationResult{}, err
@@ -132,6 +135,9 @@ func (s *Service) CompareAssessments(caseID string, base, target int) (Assessmen
 	}
 	if bp.Revision == 0 || tp.Revision == 0 || ba.CaseID != caseID || ta.CaseID != caseID {
 		return AssessmentComparison{}, domain.NewError(domain.CodeIntegrity, "分析修订绑定不完整")
+	}
+	if err := requireEngine(s.engine); err != nil {
+		return AssessmentComparison{}, err
 	}
 	bv, err := s.engine.VerifyAssessment(ba, bp, value.Receivers)
 	if err != nil {
@@ -232,6 +238,8 @@ func (s *Service) FreezePreflight(caseID string, expectedVersion int64) (FreezeP
 		p, ok := value.LatestProposal()
 		if !ok || p.Revision != a.ProposalRevision {
 			r.Blocking = append(r.Blocking, "候选与分析修订未绑定")
+		} else if e := requireEngine(s.engine); e != nil {
+			r.Blocking = append(r.Blocking, "分析复算执行失败: "+e.Error())
 		} else {
 			v, e := s.engine.VerifyAssessment(a, p, value.Receivers)
 			if e != nil {
@@ -290,6 +298,9 @@ func (s *Service) GetAnalysisBasis(caseID string) (AnalysisBasis, error) {
 	assessment, ok := value.LatestAssessment()
 	if !ok {
 		return AnalysisBasis{}, domain.NewError(domain.CodeNotFound, "协调案尚无分析修订")
+	}
+	if err := requireEngine(s.engine); err != nil {
+		return AnalysisBasis{}, err
 	}
 	var proposal domain.TransmitterProposal
 	found := false

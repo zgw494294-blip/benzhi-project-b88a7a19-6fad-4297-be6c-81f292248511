@@ -18,6 +18,9 @@ type VerificationReport struct {
 }
 
 func (e *Engine) VerifyAssessment(assessment domain.InterferenceAssessment, proposal domain.TransmitterProposal, receivers []domain.ProtectedReceiver) (VerificationReport, error) {
+	if e == nil || e.Version == "" {
+		return VerificationReport{}, domain.NewError(domain.CodeIntegrity, "分析引擎版本缺失")
+	}
 	report := VerificationReport{AlgorithmSupported: assessment.AlgorithmVersion == e.Version, Issues: []string{}}
 	inputValid, computedDigest, err := e.VerifyInput(assessment, proposal, receivers)
 	if err != nil {

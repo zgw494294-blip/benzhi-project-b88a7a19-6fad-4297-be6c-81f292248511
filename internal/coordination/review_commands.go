@@ -11,6 +11,9 @@ func (s *Service) RunAnalysis(caseID string, command VersionedCommand) (*domain.
 	if err := requireActor(command.Actor); err != nil {
 		return nil, err
 	}
+	if err := requireEngine(s.engine); err != nil {
+		return nil, err
+	}
 	value, _, err := s.repository.Update(caseID, command.ExpectedVersion, "assessment_completed", strings.TrimSpace(command.Actor), nil, nil, func(value *domain.CoordinationCase) error {
 		proposal, ok := value.LatestProposal()
 		if !ok {
@@ -77,6 +80,9 @@ func (s *Service) DecideReview(caseID string, command ReviewCommand) (*domain.Co
 
 func (s *Service) Freeze(caseID string, command FreezeCommand) (*domain.CoordinationCase, error) {
 	if err := requireActor(command.FrozenBy); err != nil {
+		return nil, err
+	}
+	if err := requireEngine(s.engine); err != nil {
 		return nil, err
 	}
 	value, _, err := s.repository.Update(caseID, command.ExpectedVersion, "case_frozen", strings.TrimSpace(command.FrozenBy), nil, nil, func(value *domain.CoordinationCase) error {

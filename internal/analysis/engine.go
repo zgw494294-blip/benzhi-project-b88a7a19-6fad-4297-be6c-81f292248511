@@ -65,9 +65,30 @@ func assessmentFromResult(input Input, version, digest string, result evaluation
 	return domain.InterferenceAssessment{
 		ID: input.AssessmentID, CaseID: input.CaseID, Revision: input.Revision,
 		ProposalRevision: input.Proposal.Revision, AlgorithmVersion: version,
-		InputDigest: digest, PointResults: result.PointResults, OverallOutcome: result.OverallOutcome,
+		InputDigest: digest, PointResults: clonePointResults(result.PointResults), OverallOutcome: result.OverallOutcome,
 		MinimumMarginDB: result.MinimumMarginDB, CreatedAt: input.CreatedAt.UTC(),
 	}
+}
+
+// clonePointResults returns a deep copy of the point assessments so that the
+// returned slice, each element, and each element's Rules slice are fully
+// independent of any cached or concurrently shared backing array. Callers can
+// mutate any returned result without affecting the engine cache or other
+// concurrent callers.
+func clonePointResults(points []domain.PointAssessment) []domain.PointAssessment {
+	if points == nil {
+		return nil
+	}
+	clone := make([]domain.PointAssessment, len(points))
+	for i := range points {
+		clone[i] = points[i]
+		if rules := points[i].Rules; len(rules) > 0 {
+			duplicated := make([]string, len(rules))
+			copy(duplicated, rules)
+			clone[i].Rules = duplicated
+		}
+	}
+	return clone
 }
 
 func (e *Engine) cachedResult(digest string) (evaluationResult, bool) {

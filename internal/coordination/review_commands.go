@@ -12,7 +12,32 @@ func (s *Service) RunAnalysisContext(ctx context.Context, caseID string, command
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return s.RunAnalysis(caseID, command)
+	if err := requireActor(command.Actor); err != nil {
+		return nil, err
+	}
+	value, _, err := s.repository.Update(caseID, command.ExpectedVersion, "assessment_completed", strings.TrimSpace(command.Actor), nil, nil, func(value *domain.CoordinationCase) error {
+		// 应用事务等待阶段：取得当前协调案状态后再次校验取消信号，避免在等待期间被取消的请求继续推进状态。
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		proposal, ok := value.LatestProposal()
+		if !ok {
+			return domain.NewError(domain.CodeIntegrity, "找不到最新候选修订")
+		}
+		assessment, err := s.engine.Evaluate(analysis.Input{
+			CaseID: value.ID, AssessmentID: s.newID("assessment"), Revision: len(value.Assessments) + 1,
+			Proposal: proposal, Receivers: value.Receivers, CreatedAt: s.clock(),
+		})
+		if err != nil {
+			return err
+		}
+		// 分析引擎计算阶段：评估完成后、附加分析结果前再次校验取消信号，确保取消的请求不附加结果、不推进版本。
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		return value.AttachAssessment(assessment, s.clock())
+	})
+	return value, err
 }
 
 func (s *Service) RunAnalysis(caseID string, command VersionedCommand) (*domain.CoordinationCase, error) {

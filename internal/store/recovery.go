@@ -36,15 +36,10 @@ func (r *Repository) recover() error {
 	}
 	snapshot, snapshotErr := readSnapshot(r.snapshotPath)
 	if len(events) == 0 && snapshotErr == nil && snapshot.LastSequence > 0 {
-		for id, value := range snapshot.Cases {
-			r.cases[id] = cloneCase(value)
-		}
-		for key, record := range snapshot.Idempotency {
-			r.idempotency[key] = cloneIdempotency(record)
-		}
-		r.lastSequence = snapshot.LastSequence
-		r.lastHash = snapshot.LastHash
-		return nil
+		// 投影快照只是加速恢复的缓存；事件账本才是事实依据。
+		// 缺少事实账本却存在投影快照时，投影数据没有审计链支撑，
+		// 不得直接对外暴露，必须报完整性错误以便运维介入。
+		return domain.NewError(domain.CodeIntegrity, "事件账本缺失或为空，但投影快照存在协调案投影；缺少事实账本不能恢复投影")
 	}
 	for _, event := range events {
 		if err := domain.ValidateCaseIntegrity(event.Case); err != nil {

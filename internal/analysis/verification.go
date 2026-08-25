@@ -34,10 +34,10 @@ func (e *Engine) VerifyAssessment(assessment domain.InterferenceAssessment, prop
 	if !report.AlgorithmSupported {
 		return report, nil
 	}
-	recomputed, err := e.Evaluate(Input{
+	recomputed, err := e.evaluate(Input{
 		CaseID: assessment.CaseID, AssessmentID: assessment.ID, Revision: assessment.Revision,
 		Proposal: proposal, Receivers: receivers, CreatedAt: assessment.CreatedAt,
-	})
+	}, false)
 	if err != nil {
 		return VerificationReport{}, err
 	}

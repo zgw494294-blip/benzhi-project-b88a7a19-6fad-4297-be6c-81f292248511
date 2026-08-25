@@ -8,6 +8,10 @@ import (
 )
 
 func (e *Engine) Evaluate(input Input) (domain.InterferenceAssessment, error) {
+	return e.evaluate(input, true)
+}
+
+func (e *Engine) evaluate(input Input, useCache bool) (domain.InterferenceAssessment, error) {
 	if e == nil || e.Version == "" {
 		return domain.InterferenceAssessment{}, domain.NewError(domain.CodeIntegrity, "分析引擎版本缺失")
 	}
@@ -28,6 +32,11 @@ func (e *Engine) Evaluate(input Input) (domain.InterferenceAssessment, error) {
 	if err != nil {
 		return domain.InterferenceAssessment{}, err
 	}
+	if useCache {
+		if cached, ok := e.cachedResult(digest); ok {
+			return assessmentFromResult(input, e.Version, digest, cached), nil
+		}
+	}
 	results := make([]domain.PointAssessment, 0, len(receivers))
 	minimumMargin := math.Inf(1)
 	overallPass := true
@@ -45,12 +54,36 @@ func (e *Engine) Evaluate(input Input) (domain.InterferenceAssessment, error) {
 	if !overallPass {
 		outcome = "fail"
 	}
+	result := evaluationResult{PointResults: results, OverallOutcome: outcome, MinimumMarginDB: round(minimumMargin)}
+	if useCache {
+		e.cacheResult(digest, result)
+	}
+	return assessmentFromResult(input, e.Version, digest, result), nil
+}
+
+func assessmentFromResult(input Input, version, digest string, result evaluationResult) domain.InterferenceAssessment {
 	return domain.InterferenceAssessment{
 		ID: input.AssessmentID, CaseID: input.CaseID, Revision: input.Revision,
-		ProposalRevision: input.Proposal.Revision, AlgorithmVersion: e.Version,
-		InputDigest: digest, PointResults: results, OverallOutcome: outcome,
-		MinimumMarginDB: round(minimumMargin), CreatedAt: input.CreatedAt.UTC(),
-	}, nil
+		ProposalRevision: input.Proposal.Revision, AlgorithmVersion: version,
+		InputDigest: digest, PointResults: result.PointResults, OverallOutcome: result.OverallOutcome,
+		MinimumMarginDB: result.MinimumMarginDB, CreatedAt: input.CreatedAt.UTC(),
+	}
+}
+
+func (e *Engine) cachedResult(digest string) (evaluationResult, bool) {
+	e.cacheMu.RLock()
+	defer e.cacheMu.RUnlock()
+	result, ok := e.cache[digest]
+	return result, ok
+}
+
+func (e *Engine) cacheResult(digest string, result evaluationResult) {
+	e.cacheMu.Lock()
+	defer e.cacheMu.Unlock()
+	if e.cache == nil {
+		e.cache = make(map[string]evaluationResult)
+	}
+	e.cache[digest] = result
 }
 
 func (e *Engine) evaluatePoint(proposal domain.TransmitterProposal, receiver domain.ProtectedReceiver) domain.PointAssessment {

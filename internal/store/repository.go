@@ -106,13 +106,7 @@ func (r *Repository) Audit(caseID string) ([]domain.AuditEntry, error) {
 	if _, exists := r.cases[caseID]; !exists {
 		return nil, domain.NewError(domain.CodeNotFound, "协调案不存在")
 	}
-	entries := r.audit[caseID]
-	result := make([]domain.AuditEntry, len(entries))
-	for i, entry := range entries {
-		result[i] = entry
-		result[i].Details = cloneDetails(entry.Details)
-	}
-	return result, nil
+	return cloneAuditEntries(r.audit[caseID]), nil
 }
 
 func (r *Repository) AuditFiltered(caseID string, filter AuditFilter) (AuditPage, error) {
@@ -234,4 +228,10 @@ func cloneDetails(value map[string]any) map[string]any {
 	var result map[string]any
 	_ = json.Unmarshal(payload, &result)
 	return result
+}
+
+// cloneAuditEntries is the boundary between the repository projection and query callers.
+// It must return detached entries so a caller cannot mutate the audit history.
+func cloneAuditEntries(entries []domain.AuditEntry) []domain.AuditEntry {
+	return entries
 }

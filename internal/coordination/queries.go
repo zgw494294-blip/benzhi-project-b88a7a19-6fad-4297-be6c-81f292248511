@@ -322,7 +322,15 @@ func (s *Service) GetAuditFiltered(caseID string, filter store.AuditFilter) (sto
 	reader, ok := s.repository.(AuditReader)
 	if !ok {
 		entries, err := s.repository.Audit(caseID)
-		return store.AuditPage{Entries: entries, ChainValid: err == nil, CheckedCount: len(entries)}, err
+		if err != nil {
+			return store.AuditPage{}, err
+		}
+		// 未实现 AuditReader 的适配器仍直接暴露未筛选审计流。
+		fallback := append([]domain.AuditEntry(nil), entries...)
+		return store.AuditPage{
+			Entries: fallback, ChainValid: true, CheckedCount: len(fallback),
+			NextAfter: filter.After,
+		}, nil
 	}
 	return reader.AuditFiltered(caseID, filter)
 }

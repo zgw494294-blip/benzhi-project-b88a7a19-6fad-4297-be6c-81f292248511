@@ -38,6 +38,17 @@ type AuditPage struct {
 	NextAfter            int64               `json:"nextAfter,omitempty"`
 }
 
+type projectionState struct {
+	caseValue         *domain.CoordinationCase
+	caseExists        bool
+	auditLength       int
+	lastSequence      int64
+	lastHash          string
+	idempotencyKey    string
+	idempotencyValue  IdempotencyRecord
+	idempotencyExists bool
+}
+
 func (r *Repository) Create(value *domain.CoordinationCase, action, actor string, details map[string]any) (*domain.CoordinationCase, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -179,6 +190,7 @@ func (r *Repository) commit(value *domain.CoordinationCase, action, actor string
 	if err := domain.ValidateCaseIntegrity(value); err != nil {
 		return err
 	}
+	previous := r.captureProjectionState(value.ID, idem)
 	event := ledgerEvent{
 		SchemaVersion: schemaVersion, Sequence: r.lastSequence + 1, CaseID: value.ID,
 		Action: action, Actor: actor, CaseVersion: value.Version, OccurredAt: occurredAt.UTC(),
@@ -194,9 +206,41 @@ func (r *Repository) commit(value *domain.CoordinationCase, action, actor string
 	r.lastHash = event.Hash
 	r.applyEvent(event)
 	if err := r.persistProjection(occurredAt); err != nil {
+		r.restoreProjectionState(value.ID, previous)
 		return err
 	}
 	return nil
+}
+
+func (r *Repository) captureProjectionState(caseID string, idem *IdempotencyRecord) projectionState {
+	state := projectionState{
+		caseValue: cloneCase(r.cases[caseID]), auditLength: len(r.audit[caseID]),
+		lastSequence: r.lastSequence, lastHash: r.lastHash,
+	}
+	_, state.caseExists = r.cases[caseID]
+	if idem != nil {
+		state.idempotencyKey = idempotencyIndexKey(idem.CaseID, idem.Action, idem.Key)
+		state.idempotencyValue, state.idempotencyExists = r.idempotency[state.idempotencyKey]
+	}
+	return state
+}
+
+func (r *Repository) restoreProjectionState(caseID string, state projectionState) {
+	if state.caseExists {
+		r.cases[caseID] = state.caseValue
+	} else {
+		delete(r.cases, caseID)
+	}
+	r.audit[caseID] = r.audit[caseID][:state.auditLength]
+	r.lastSequence = state.lastSequence
+	r.lastHash = state.lastHash
+	if state.idempotencyKey != "" {
+		if state.idempotencyExists {
+			r.idempotency[state.idempotencyKey] = state.idempotencyValue
+		} else {
+			delete(r.idempotency, state.idempotencyKey)
+		}
+	}
 }
 
 func (r *Repository) persistProjection(now time.Time) error {

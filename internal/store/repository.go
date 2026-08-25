@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"os"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ type Repository struct {
 	mu           sync.RWMutex
 	directory    string
 	ledgerPath   string
+	ledgerFile   *os.File
 	snapshotPath string
 	cases        map[string]*domain.CoordinationCase
 	idempotency  map[string]IdempotencyRecord
@@ -187,7 +189,7 @@ func (r *Repository) commit(value *domain.CoordinationCase, action, actor string
 	if err := sealEvent(&event); err != nil {
 		return err
 	}
-	if err := appendLedger(r.ledgerPath, event); err != nil {
+	if err := r.appendLedger(event); err != nil {
 		return err
 	}
 	r.lastSequence = event.Sequence

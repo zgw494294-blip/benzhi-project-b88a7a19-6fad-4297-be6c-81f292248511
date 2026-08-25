@@ -82,22 +82,20 @@ func verifyEvent(event ledgerEvent, expectedSequence int64, previousHash string)
 	return nil
 }
 
-func appendLedger(path string, event ledgerEvent) error {
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		return domain.WrapIntegrity("无法打开事件账本", err)
+func (r *Repository) appendLedger(event ledgerEvent) error {
+	if r.ledgerFile == nil {
+		file, err := os.OpenFile(r.ledgerPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			return domain.WrapIntegrity("无法打开事件账本", err)
+		}
+		r.ledgerFile = file
 	}
-	encoder := json.NewEncoder(file)
+	encoder := json.NewEncoder(r.ledgerFile)
 	if err := encoder.Encode(event); err != nil {
-		_ = file.Close()
 		return domain.WrapIntegrity("无法追加事件账本", err)
 	}
-	if err := file.Sync(); err != nil {
-		_ = file.Close()
+	if err := r.ledgerFile.Sync(); err != nil {
 		return domain.WrapIntegrity("无法同步事件账本", err)
-	}
-	if err := file.Close(); err != nil {
-		return domain.WrapIntegrity("无法关闭事件账本", err)
 	}
 	return nil
 }

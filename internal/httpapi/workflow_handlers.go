@@ -14,7 +14,7 @@ func (a *API) RunAnalysisHandler(writer http.ResponseWriter, request *http.Reque
 		writeError(writer, request, err)
 		return
 	}
-	value, err := a.service.RunAnalysis(request.PathValue("caseID"), command)
+	value, err := a.service.RunAnalysisContext(request.Context(), request.PathValue("caseID"), command)
 	if err != nil {
 		writeError(writer, request, err)
 		return

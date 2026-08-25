@@ -1,11 +1,19 @@
 package coordination
 
 import (
+	"context"
 	"strings"
 
 	"benzhi-project-b88a7a19-6fad-4297-be6c-81f292248511/internal/analysis"
 	"benzhi-project-b88a7a19-6fad-4297-be6c-81f292248511/internal/domain"
 )
+
+func (s *Service) RunAnalysisContext(ctx context.Context, caseID string, command VersionedCommand) (*domain.CoordinationCase, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return s.RunAnalysis(caseID, command)
+}
 
 func (s *Service) RunAnalysis(caseID string, command VersionedCommand) (*domain.CoordinationCase, error) {
 	if err := requireActor(command.Actor); err != nil {

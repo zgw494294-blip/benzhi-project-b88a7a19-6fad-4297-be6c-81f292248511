@@ -218,6 +218,13 @@ func cloneCase(value *domain.CoordinationCase) *domain.CoordinationCase {
 	payload, _ := json.Marshal(value)
 	var result domain.CoordinationCase
 	_ = json.Unmarshal(payload, &result)
+	result.Proposals = value.Proposals
+	result.Receivers = value.Receivers
+	result.Assessments = value.Assessments
+	result.Reviews = value.Reviews
+	result.ReviewResponses = value.ReviewResponses
+	result.Frozen = value.Frozen
+	result.Authorization = value.Authorization
 	return &result
 }
 

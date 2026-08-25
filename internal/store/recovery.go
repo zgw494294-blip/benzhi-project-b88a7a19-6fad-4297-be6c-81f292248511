@@ -34,6 +34,18 @@ func (r *Repository) recover() error {
 	if err != nil {
 		return err
 	}
+	snapshot, snapshotErr := readSnapshot(r.snapshotPath)
+	if len(events) == 0 && snapshotErr == nil && snapshot.LastSequence > 0 {
+		for id, value := range snapshot.Cases {
+			r.cases[id] = cloneCase(value)
+		}
+		for key, record := range snapshot.Idempotency {
+			r.idempotency[key] = cloneIdempotency(record)
+		}
+		r.lastSequence = snapshot.LastSequence
+		r.lastHash = snapshot.LastHash
+		return nil
+	}
 	for _, event := range events {
 		if err := domain.ValidateCaseIntegrity(event.Case); err != nil {
 			return domain.WrapIntegrity("账本包含无效协调案投影", err)
@@ -45,7 +57,6 @@ func (r *Repository) recover() error {
 		r.lastSequence = last.Sequence
 		r.lastHash = last.Hash
 	}
-	snapshot, snapshotErr := readSnapshot(r.snapshotPath)
 	if snapshotErr == nil && snapshot.LastSequence == r.lastSequence && snapshot.LastHash == r.lastHash {
 		// 即使快照有效，账本重放仍是事实依据；这里仅确认其一致性。
 		return nil
